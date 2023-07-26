@@ -237,7 +237,7 @@ fig_B_v1 <- function() {
 }
 
 fig_B_v1()
-figure_save_draft_png(fig_B_v1(), style_SAR_CCDR, "fig_B_v1.png", height=4.1, width=5.5)
+figure_save_draft_png(fig_B_v1(), style_SAR_CCDR, "../png/fig_B_v1.png", height=4.1, width=5.5)
 
 ```
 
@@ -346,7 +346,7 @@ fig_C_v1 <- function() {
 }
 
 fig_C_v1()
-figure_save_draft_png(fig_C_v1(), style_SAR_CCDR, "fig_C_v1.png", height=4.1, width=5.5)
+figure_save_draft_png(fig_C_v1(), style_SAR_CCDR, "../png/fig_C_v1.png", height=4.1, width=5.5)
 
 ```
 
@@ -404,7 +404,7 @@ fig_D_v1 <- function() {
 
 fig_D_v1()
 
-figure_save_draft_png(fig_D_v1(), style_SAR_CCDR, "fig_D_v1.png", height=3.1, width=5.5)
+figure_save_draft_png(fig_D_v1(), style_SAR_CCDR, "../png/fig_D_v1.png", height=3.1, width=5.5)
 
 ```
 
