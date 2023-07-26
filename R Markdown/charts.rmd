@@ -1,0 +1,411 @@
+---
+title: "Pakistan Disasters"
+date: "07/26/2023"
+output:
+  github_document: default
+  html_document: default
+knit: (function(inputFile, encoding) {
+      rmarkdown::render(inputFile,
+                        encoding=encoding,
+                        output_format = "github_document");
+      rmarkdown::render(inputFile,
+                        encoding=encoding,
+                        output_format = "html_document",
+                        output_dir=file.path(dirname(inputFile), "../html/"))                  
+      })
+---
+
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning = FALSE}
+source("../styles/SAR_CCDR_style.R")
+source("../utils/CCDR_utils.R")
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(ggalt)
+library(forcats)
+library(png)
+library(ggpubr)
+library(ggrepel)
+library(scales)
+library(hrbrthemes)
+library(viridis)
+library(wbstats)
+library(wbgcharts)
+library(readr)
+library(readxl)
+library(gtable)
+library(grid)
+library(lubridate)
+library(extrafont)
+library(zoo)
+create_wbgref()
+style = style_SAR_CCDR()
+```
+
+
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+## Chart A - Number of events and annual average economic damages (% GDP) from natural disasters
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE, fig.height=4.1, fig.width=5.5, out.width=800, dpi=200}
+
+
+fig_A_v1 <- function() {
+  
+  # data
+  GDP_df <- wb_data(
+    indicator = c("NY.GDP.MKTP.CD"),
+    country = c("PAK"),
+    start_date = 1963,
+    end_date = 2022) %>%
+    rename(Year = date)%>%
+    rename(GDP = `NY.GDP.MKTP.CD`)
+  
+  GDP_2022 <- GDP_df$GDP[length(GDP_df$GDP)]
+  
+  df <- read_excel("../data/Pakistan disasters data.xlsx", skip=6) %>%
+    mutate(Year = as.numeric(Year)) %>%
+    filter(Year >= 1963 & Year <= 2022) %>%
+    mutate(Decade = as.numeric(paste0(substr(Year-3, 1, 3), '0'))) %>%
+    rename(Group = `Disaster Subgroup`) %>%
+    rename(Type = `Disaster Type`) %>%
+    rename(Affected = `Total Affected`) %>%
+    mutate(Damages = `Total Damages, Adjusted ('000 US$)`*1000) %>%
+    select(Year, Seq, Decade, Group, Type, Affected, Damages)
+  
+  df <- left_join(df, GDP_df, by = "Year") %>%
+    mutate(Damages = Damages/GDP_2022 * 100)
+  
+  
+  df <- df %>%
+    group_by(Decade, Type) %>%
+    summarise(Occurrence = n(),
+              Affected = sum(Affected, na.rm=TRUE)/10,
+              Damages = sum(Damages, na.rm=TRUE)/10,
+              .groups = 'drop') %>%
+    filter(Damages > 0)
+  
+  # chart
+  figure(
+    data =  df,
+    plot = function(df, style = style_SAR_CCDR()) {
+      p <- ggplot(df, aes(x=Decade, y=reorder(Type, desc(Type)), size=Damages, color=Occurrence, fill=Occurrence)) +
+        geom_point(alpha=0.5, shape=21, color="black") +
+        scale_size(range = c(1, 15), name="Damage (%GDP)",
+                   breaks = c(0.1, 0.3, 0.5),
+                   labels = c("0.1", "0.3", "0.5")) +
+        scale_fill_distiller(palette = "Spectral") +
+        scale_x_continuous(limits = c(1960, 2014), breaks = c(1960, 1970, 1980, 1990, 2000, 2010), labels = c("1963-1972", "1973-1982", "1983-1992", "1993-2002", "2003-2012", "2013-2022")) +
+        xlab("Year") +
+        ylab("Natural Disasters") +
+        geom_curve(aes(x = 1975, y = 2, xend = 1972, yend = 2.7),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = 0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 1975, y = 1.8, label = "including 1973 floods in Pubjab and Sindh", size = 2.5, family = style$family) +
+        geom_curve(aes(x = 1995, y = 3.7, xend = 1997, yend = 3.35),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = 0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 1995, y = 3.9, label = "including 2010 floods", size = 2.5, family = style$family) +
+        geom_curve(aes(x = 2006, y = 2.3, xend = 2008, yend = 2.6),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = -0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 2006, y = 2.2, label = "including 2022 floods", size = 2.5, family = style$family) +
+        style$theme() +
+        theme(
+          axis.title.x = element_text(vjust = -5),
+          axis.title.y = element_text(angle = 90, vjust = 0, margin = margin(r = 15)),
+          axis.text.x = element_text(angle = 0, vjust = 2), 
+          legend.title = element_text(),
+          legend.box.just = "center",
+          legend.position = "right"
+        )
+    },
+    aspect_ratio = 1,
+    subtitle = "Number of events and annual average economic damages (% GDP) from natural disasters",
+    note = "Note: The occurrence is measured by combining the total count of events, while the average economic damage is quantified by calculating the yearly average value over the ten-year period. To calculate %GDP, adjusted total damage is divided by the 2022 GDP.",
+    source = "Source: The international disasters database"
+  )
+}
+
+fig_A_v1()
+figure_save_draft_png(fig_A_v1(), style_SAR_CCDR, "../png/fig_A_v1.png", height=4.1, width=5.5)
+
+```
+
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+## Chart B - Number of events and annual average people affected (% population) from natural disasters
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE, fig.height=4.1, fig.width=5.5, out.width=800, dpi=200}
+
+fig_B_v1 <- function() {
+  
+  # data
+  pop_df <- wb_data(
+    indicator = c("SP.POP.TOTL"),
+    country = c("PAK"),
+    start_date = 1963,
+    end_date = 2022) %>%
+    rename(Year = date)%>%
+    rename(Pop = `SP.POP.TOTL`)
+  
+  df <- read_excel("../data/Pakistan disasters data.xlsx", skip=6) %>%
+    mutate(Year = as.numeric(Year)) %>%
+    filter(Year >= 1963 & Year <= 2022) %>%
+    mutate(Decade = as.numeric(paste0(substr(Year-3, 1, 3), '0'))) %>%
+    rename(Group = `Disaster Subgroup`) %>%
+    rename(Type = `Disaster Type`) %>%
+    rename(Affected = `Total Affected`) %>%
+    mutate(Damages = `Total Damages, Adjusted ('000 US$)`*1000) %>%
+    select(Year, Seq, Decade, Group, Type, Affected, Damages)
+  
+  df <- left_join(df, pop_df, by = "Year") %>%
+    mutate(Affected = Affected/Pop * 100)
+  
+  df <- df %>%
+    group_by(Decade, Type) %>%
+    summarise(Occurrence = n(),
+              Affected = sum(Affected, na.rm=TRUE)/10,
+              Damages = sum(Damages, na.rm=TRUE)/10,
+              .groups = 'drop') %>%
+    filter(Damages > 0)
+  
+  # chart
+  figure(
+    data =  df,
+    plot = function(df, style = style_SAR_CCDR()) {
+      p <- ggplot(df, aes(x=Decade, y=reorder(Type, desc(Type)), size=Affected, color=Occurrence, fill=Occurrence)) +
+        geom_point(alpha=0.5, shape=21, color="black") +
+        scale_size(range = c(0.5, 15), name="Affected people",
+                   breaks = c(0.5, 1, 1.5),
+                   labels = c("0.5%", "1%", "1.5%")) +
+        scale_fill_distiller(palette = "Spectral") +
+        scale_x_continuous(limits = c(1960, 2014), breaks = c(1960, 1970, 1980, 1990, 2000, 2010), labels = c("1963-1972", "1973-1982", "1983-1992", "1993-2002", "2003-2012", "2013-2022")) +
+        xlab("Year") +
+        ylab("Natural Disasters") +
+        geom_curve(aes(x = 1975, y = 2.3, xend = 1973, yend = 2.7),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = 0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 1975, y = 2.2, label = "including 1973 floods in Pubjab and Sindh", size = 2.5, family = style$family) +
+        geom_curve(aes(x = 1995, y = 3.7, xend = 1997, yend = 3.3),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = 0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 1995, y = 3.8, label = "including 2010 floods", size = 2.5, family = style$family) +
+        geom_curve(aes(x = 2006, y = 2.4, xend = 2008, yend = 2.65),
+                   colour = "#555555",
+                   size=0.3,
+                   curvature = -0.2,
+                   arrow = arrow(length = unit(0.03, "npc"))) +
+        annotate("text", x = 2006, y = 2.3, label = "including 2022 floods", size = 2.5, family = style$family) +
+        style$theme() +
+        theme(
+          axis.title.x = element_text(vjust = -5),
+          axis.title.y = element_text(angle = 90, vjust = 0, margin = margin(r = 15)),
+          axis.text.x = element_text(angle = 0, vjust = 2), 
+          legend.title = element_text(),
+          legend.box.just = "center",
+          legend.position = "right"
+        )
+    },
+    aspect_ratio = 1,
+    subtitle = "Number of events and annual average people affected (% population) from natural disasters",
+    note = "Note: The occurrence is measured by combining the total count of events, while the average affected people are quantified by calculating the yearly average value over the ten-year period. To calculate % population, total number of people affected is divided by the population at the time of the disaster.",
+    source = "Source: The international disasters database"
+  )
+}
+
+fig_B_v1()
+figure_save_draft_png(fig_B_v1(), style_SAR_CCDR, "fig_B_v1.png", height=4.1, width=5.5)
+
+```
+
+
+
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+## Chart C - Number of events and economic damages (% GDP) from natural disasters
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE, fig.height=4.1, fig.width=5.5, out.width=800, dpi=200}
+
+fig_C_v1 <- function() {
+  
+  # data
+  GDP_df <- wb_data(
+    indicator = c("NY.GDP.MKTP.CD"),
+    country = c("PAK"),
+    start_date = 1963,
+    end_date = 2022) %>%
+    rename(Year = date)%>%
+    rename(GDP = `NY.GDP.MKTP.CD`)
+  
+  GDP_2022 <- GDP_df$GDP[length(GDP_df$GDP)]
+  
+  pop_df <- wb_data(
+    indicator = c("SP.POP.TOTL"),
+    country = c("PAK"),
+    start_date = 1963,
+    end_date = 2022) %>%
+    rename(Year = date)%>%
+    rename(Pop = `SP.POP.TOTL`)
+  
+  
+  
+  df <- read_excel("../data/Pakistan disasters data.xlsx", skip=6) %>%
+    mutate(Year = as.numeric(Year)) %>%
+    filter(Year >= 1963 & Year <= 2022) %>%
+    mutate(Decade = as.numeric(paste0(substr(Year-3, 1, 3), '0'))) %>%
+    rename(Group = `Disaster Subgroup`) %>%
+    rename(Type = `Disaster Type`) %>%
+    rename(Affected = `Total Affected`) %>%
+    mutate(Damages = `Total Damages, Adjusted ('000 US$)`*1000) %>%
+    select(Year, Seq, Decade, Group, Type, Affected, Damages)
+  
+  df <- df %>%
+    group_by(Year, Type) %>%
+    summarise(Occurrence = n(),
+              Affected = sum(Affected, na.rm=TRUE),
+              Damages = sum(Damages, na.rm=TRUE),
+              .groups = 'drop')
+  
+  df <- full_join(df, GDP_df, by = "Year") %>%
+    mutate(Damages = Damages/GDP_2022 * 100)
+  
+  df <- full_join(df, pop_df, by = "Year") %>%
+    mutate(Affected = Affected/Pop * 100)
+  
+  df_damages <- df %>%
+    group_by(Year) %>%
+    summarise(Damages = sum(Damages, na.rm=TRUE),
+              Type = "",
+              .groups = 'drop')
+  
+  
+  coeff <- 0.5
+  
+  color_list = c(
+    "Flood" = style$colors$blue,   
+    "Drought" = style$colors$orange,  
+    "Landslide" = style$colors$purple,
+    "Extreme temperature" = style$colors$red,
+    "Storm" = style$colors$navy)
+  
+  # chart
+  figure(
+    data =  df,
+    plot = function(df, style = style_SAR_CCDR()) {
+      p <- ggplot(df, aes(x=Year, y=Occurrence, fill=Type)) +
+        geom_bar(position="stack", stat="identity", alpha=0.75) +
+        geom_line(data=df_damages, aes(x=Year, y = Damages/coeff, color = "Damages"), size = 1) +
+        scale_y_continuous(
+          name = "Occurrence",
+          breaks = c(2, 4, 6, 8, 10), labels = c(2, 4, 6, 8, 10),
+          sec.axis = sec_axis(~.*coeff, name="Damages (% GDP)")) +
+        scale_colour_manual(" ", values=c("Damages" = "grey20"))+
+        scale_fill_manual(values = color_list) +
+        style$theme() +
+        theme(
+          axis.title.x = element_text(vjust = -5),
+          axis.title.y = element_text(angle = 90, vjust = 0),
+          axis.text.x = element_text(angle = 0, vjust = 1), 
+          # legend.title = element_text(),
+          legend.box.just = "center",
+          legend.position = "bottom"
+        )
+    },
+    aspect_ratio = 1,
+    subtitle = "Number of events and economic damages (% GDP) from natural disasters",
+    note = "Note: To calculate %GDP, adjusted total damage is divided by the 2022 GDP.",
+    source = "Source: The international disasters database"
+  )
+}
+
+fig_C_v1()
+figure_save_draft_png(fig_C_v1(), style_SAR_CCDR, "fig_C_v1.png", height=4.1, width=5.5)
+
+```
+
+
+
+
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+## Chart D - **********
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE, fig.height=3.1, fig.width=5.5, out.width=800, dpi=200}
+
+fig_D_v1 <- function() {
+  
+  # data
+  df <- read_excel("../data/regional data.xlsx")
+  df <- df %>%
+    gather(key="year", value="percent", "2011-12":"2015-16") %>%
+    select(region, year, percent)
+  
+  # chart
+  color_list = c(
+    "National" = style$colors$blue, 
+    "Federal" = style$colors$neutral,   
+    "Khyber Pakhtunkhwa" = style$colors$neutral,
+    "Balochistan " = style$colors$neutral,
+    "Punjab " = style$colors$neutral,
+    "Sindh " = style$colors$neutral,
+    "FATA" = style$colors$neutral)
+  
+  figure(
+    data = df,
+    plot = function(df, style = style_SAR_CCDR()) {
+      ggplot(df, aes(x = year, y = percent, group = region, color = region)) +
+        geom_line(size = style$linesize) +
+        # scale_x_continuous(breaks = bracketed_breaks(df$year), expand=c(0,0)) +
+        scale_y_continuous(
+          position="left",
+          sec.axis = dup_axis(
+            breaks = df %>% filter(year == "2015-16") %>% pull(percent) %>% repel(gap=6),
+            labels = df %>% filter(year == "2015-16") %>% pull(region)
+          )) +
+        scale_color_manual(values = color_list, labels = unique(df$region)) +
+        style$theme()
+    },
+    aspect_ratio = 1,
+    subtitle = "********** by region (unit = %), 2011-2016",
+    source = "Source: **********"
+  )
+}
+
+fig_D_v1()
+
+figure_save_draft_png(fig_D_v1(), style_SAR_CCDR, "fig_D_v1.png", height=3.1, width=5.5)
+
+```
+
+  
